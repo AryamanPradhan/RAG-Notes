@@ -7,6 +7,7 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from dotenv import load_dotenv
 import os
 from retriever import get_retriever
+from langchain.agents import initialize_agent, AgentType, load_tools
 
 load_dotenv()
 
@@ -31,3 +32,21 @@ def get_qa_chain(persist_path="vectorstore/faiss_index"):
     combine_docs_chain = create_stuff_documents_chain(llm, prompt)
 
     return create_retrieval_chain(retriever=retriever, combine_docs_chain=combine_docs_chain)
+
+def get_internal_answer(question: str) -> str:
+    qa_chain = get_qa_chain()
+    result = qa_chain.invoke({"input": question})
+    return result["answer"] if "answer" in result else "I don't know"
+
+def get_external_answer(question: str) -> str:
+    llm = ChatGroq(model="Gemma2-9b-it", temperature=0)
+    tools = load_tools(["wikipedia"], llm=llm)
+
+    agent = initialize_agent(
+        tools, 
+        llm, 
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, 
+        verbose=False
+    )
+    
+    return agent.run(question)
